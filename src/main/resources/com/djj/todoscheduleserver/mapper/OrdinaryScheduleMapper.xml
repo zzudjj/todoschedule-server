@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djj.todoscheduleserver.mapper.OrdinaryScheduleMapper">
+    
+    <resultMap id="OrdinaryScheduleResultMap" type="com.djj.todoscheduleserver.pojo.OrdinarySchedule">
+        <id property="crdtKey" column="crdt_key"/>
+        <result property="userId" column="user_id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="location" column="location"/>
+        <result property="category" column="category"/>
+        <result property="color" column="color"/>
+        <result property="isAllDay" column="is_all_day"/>
+        <result property="status" column="status"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="priority" column="priority"/>
+        <result property="completed" column="completed"/>
+        <result property="hlcTimestamp" column="hlc_timestamp"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <sql id="selectOrdinaryScheduleColumns">
+        crdt_key, user_id, title, description, location, category, color, is_all_day, status,
+        start_time, end_time, priority, completed,
+        hlc_timestamp, is_deleted, deleted_at
+    </sql>
+
+    <!-- 根据CRDT Key获取普通日程 -->
+    <select id="getByCrdtKey" resultMap="OrdinaryScheduleResultMap">
+        SELECT <include refid="selectOrdinaryScheduleColumns" />
+        FROM ordinary_schedule 
+        WHERE crdt_key = #{crdtKey}
+    </select>
+    
+    <!-- 获取用户的所有普通日程（未删除的） -->
+    <select id="getAllByUserId" resultMap="OrdinaryScheduleResultMap">
+        SELECT <include refid="selectOrdinaryScheduleColumns" />
+        FROM ordinary_schedule 
+        WHERE user_id = #{userId} AND is_deleted = FALSE
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 获取用户在指定时间后更新的普通日程（包括已删除的） -->
+    <select id="getUpdatedAfterTimestamp" resultMap="OrdinaryScheduleResultMap">
+        SELECT <include refid="selectOrdinaryScheduleColumns" />
+        FROM ordinary_schedule 
+        WHERE user_id = #{userId} AND hlc_timestamp > #{hlcTimestamp}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    
+    <!-- 新增或更新普通日程 -->
+    <insert id="insertOrUpdate" parameterType="com.djj.todoscheduleserver.pojo.OrdinarySchedule">
+        INSERT INTO ordinary_schedule (
+            crdt_key, user_id, title, description, location, category, color, is_all_day, status,
+            start_time, end_time, priority, completed,
+            hlc_timestamp, is_deleted, deleted_at
+        )
+        VALUES (
+            #{crdtKey}, #{userId}, #{title}, #{description}, #{location}, #{category}, #{color}, #{isAllDay}, #{status},
+            #{startTime}, #{endTime}, #{priority}, #{completed},
+            #{hlcTimestamp}, #{isDeleted, jdbcType=BOOLEAN}, #{deletedAt, jdbcType=TIMESTAMP}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            title = VALUES(title),
+            description = VALUES(description),
+            location = VALUES(location),
+            category = VALUES(category),
+            color = VALUES(color),
+            is_all_day = VALUES(is_all_day),
+            status = VALUES(status),
+            start_time = VALUES(start_time),
+            end_time = VALUES(end_time),
+            priority = VALUES(priority),
+            completed = VALUES(completed),
+            hlc_timestamp = VALUES(hlc_timestamp),
+            is_deleted = VALUES(is_deleted),
+            deleted_at = VALUES(deleted_at)
+    </insert>
+    
+    <!-- 标记为已删除 -->
+    <update id="markAsDeleted">
+        UPDATE ordinary_schedule
+        SET
+            is_deleted = TRUE,
+            deleted_at = #{deletedAt},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE
+            crdt_key = #{crdtKey}
+            AND (is_deleted = FALSE OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+</mapper> 

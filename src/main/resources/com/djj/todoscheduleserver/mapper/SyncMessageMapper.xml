@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djj.todoscheduleserver.mapper.SyncMessageMapper">
+
+    <insert id="insert" parameterType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sync_message (user_id, entity_type, crdt_key, message_data, hlc_timestamp, origin_device_id, created_at)
+        VALUES (#{userId}, #{entityType}, #{crdtKey}, #{messageData}, #{hlcTimestamp}, #{originDeviceId}, #{createdAt, jdbcType=TIMESTAMP})
+    </insert>
+
+    <select id="getMessagesAfterTimestamp" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
+        SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
+        FROM sync_message
+        WHERE user_id = #{userId}
+          AND hlc_timestamp > #{hlcTimestamp}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    
+    <select id="getMessagesAfterTimestampExcludingOriginDevice" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
+        SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
+        FROM sync_message
+        WHERE user_id = #{userId}
+          AND hlc_timestamp > #{hlcTimestamp}
+          AND origin_device_id != #{deviceId}
+        ORDER BY hlc_timestamp ASC
+    </select>
+
+    <select id="getMessagesByEntityTypeAfterTimestamp" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
+        SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
+        FROM sync_message
+        WHERE user_id = #{userId}
+          AND entity_type = #{entityType}
+          AND hlc_timestamp > #{hlcTimestamp}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    
+    <select id="getMessagesByEntityTypeAfterTimestampExcludingOriginDevice" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
+        SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
+        FROM sync_message
+        WHERE user_id = #{userId}
+          AND entity_type = #{entityType}
+          AND hlc_timestamp > #{hlcTimestamp}
+          AND origin_device_id != #{deviceId}
+        ORDER BY hlc_timestamp ASC
+    </select>
+
+    <!-- 
+    <select id="getAllMessagesForUser" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
+        SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
+        FROM sync_message
+        WHERE user_id = #{userId}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    -->
+
+</mapper> 

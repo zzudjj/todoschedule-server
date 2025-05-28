@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务提醒系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #07C160;
+            text-align: center;
+        }
+        .info-box {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .success {
+            background-color: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+        .error {
+            background-color: #fff1f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>任务提醒系统</h1>
+        
+        <div id="not-authorized" style="display:none">
+            <div class="info-box">
+                <p>请先登录您的账号，然后进行微信授权。</p>
+                <p>授权后，系统将能够向您发送任务提醒消息。</p>
+            </div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">用户名:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="button">微信授权登录</button>
+            </form>
+            
+            <div id="login-error" class="message error" style="display:none">
+                用户名或密码错误，请重试。
+            </div>
+        </div>
+        
+        <div id="authorized" style="display:none">
+            <div class="message success">
+                您已完成微信授权
+            </div>
+            
+            <div class="info-box">
+                <p><strong>您的OpenID:</strong> <span id="user-openid">-</span></p>
+                <p><strong>您的用户ID:</strong> <span id="user-id">-</span></p>
+            </div>
+            
+            <p>您可以接收任务提醒消息。</p>
+            <a href="#" class="button" id="test-btn">测试接收提醒消息</a>
+        </div>
+        
+        <div id="loading" style="text-align:center; margin-top: 20px;">
+            正在检查授权状态...
+        </div>
+        
+        <div id="result" style="display:none; margin-top: 20px;">
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const notAuthorized = document.getElementById('not-authorized');
+            const authorized = document.getElementById('authorized');
+            const loading = document.getElementById('loading');
+            const userOpenid = document.getElementById('user-openid');
+            const userId = document.getElementById('user-id');
+            const testBtn = document.getElementById('test-btn');
+            const resultDiv = document.getElementById('result');
+            const loginForm = document.getElementById('login-form');
+            const loginError = document.getElementById('login-error');
+            
+            // 从localStorage获取openid
+            const openid = localStorage.getItem('wx_openid');
+            const userIdValue = localStorage.getItem('user_id');
+            
+            // 检查是否已经授权
+            if (openid && userIdValue) {
+                loading.style.display = 'none';
+                authorized.style.display = 'block';
+                userOpenid.textContent = openid;
+                userId.textContent = userIdValue;
+                
+                // 绑定测试按钮点击事件
+                testBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    testReminder(openid);
+                });
+            } else {
+                loading.style.display = 'none';
+                notAuthorized.style.display = 'block';
+                
+                // 添加登录表单提交事件
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const username = document.getElementById('username').value;
+                    const password = document.getElementById('password').value;
+                    
+                    // 存储用户名用于后续授权请求
+                    localStorage.setItem('temp_username', username);
+                    localStorage.setItem('temp_password', password);
+                    
+                    // 重定向到授权页面，并传递当前URL
+                    window.location.href = `/oauth/authorize?redirect_url=${encodeURIComponent(window.location.href)}`;
+                });
+            }
+            
+            // 检查URL中是否有错误信息
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            
+            if (error === 'invalid_credentials') {
+                loginError.style.display = 'block';
+                // 清除临时存储的凭据
+                localStorage.removeItem('temp_username');
+                localStorage.removeItem('temp_password');
+            } else if (urlParams.has('openid')) {
+                // 授权成功，获取openid
+                const newOpenid = urlParams.get('openid');
+                if (newOpenid) {
+                    // 检查是否有临时存储的用户名和密码
+                    const tempUsername = localStorage.getItem('temp_username');
+                    const tempPassword = localStorage.getItem('temp_password');
+                    
+                    if (tempUsername && tempPassword) {
+                        // 验证用户凭据并关联openid
+                        verifyCredentials(tempUsername, tempPassword, newOpenid);
+                    } else {
+                        // 没有临时凭据，只存储openid
+                        localStorage.setItem('wx_openid', newOpenid);
+                        
+                        // 清除URL参数并刷新页面
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        window.location.reload();
+                    }
+                }
+            }
+            
+            // 验证用户名和密码并关联openid
+            function verifyCredentials(username, password, openid) {
+                // 创建表单数据
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                formData.append('openid', openid);
+                
+                // 发送POST请求验证凭据
+                fetch('/oauth/verify-credentials', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 清除临时存储的凭据
+                    localStorage.removeItem('temp_username');
+                    localStorage.removeItem('temp_password');
+                    
+                    if (data.success) {
+                        // 验证成功，保存openid和用户ID
+                        localStorage.setItem('wx_openid', openid);
+                        localStorage.setItem('user_id', data.userId);
+                        
+                        // 清除URL参数并刷新页面
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        window.location.reload();
+                    } else {
+                        // 验证失败，显示错误消息并刷新页面
+                        window.location.href = window.location.pathname + '?error=invalid_credentials';
+                    }
+                })
+                .catch(error => {
+                    console.error('验证凭据时出错:', error);
+                    // 清除临时存储的凭据并显示错误
+                    localStorage.removeItem('temp_username');
+                    localStorage.removeItem('temp_password');
+                    window.location.href = window.location.pathname + '?error=invalid_credentials';
+                });
+            }
+            
+            // 测试发送提醒消息
+            function testReminder(openid) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="message">正在发送测试提醒消息...</div>';
+                
+                fetch(`/wechat/test-reminder?openid=${openid}`)
+                    .then(response => response.text())
+                    .then(data => {
+                        resultDiv.innerHTML = `<div class="message success">${data}</div>`;
+                    })
+                    .catch(error => {
+                        resultDiv.innerHTML = `<div class="message error">发送测试提醒失败: ${error}</div>`;
+                    });
+            }
+        });
+    </script>
+</body>
+</html> 

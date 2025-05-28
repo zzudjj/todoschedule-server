@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djj.todoscheduleserver.mapper.CourseMapper">
+    
+    <resultMap id="CourseResultMap" type="com.djj.todoscheduleserver.pojo.Course">
+        <id property="crdtKey" column="crdt_key"/>
+        <result property="userId" column="user_id"/>
+        <result property="courseName" column="course_name"/>
+        <result property="color" column="color"/>
+        <result property="room" column="room"/>
+        <result property="teacher" column="teacher"/>
+        <result property="credit" column="credit"/>
+        <result property="courseCode" column="course_code"/>
+        <result property="syllabusLink" column="syllabus_link"/>
+        <result property="startNode" column="start_node"/>
+        <result property="step" column="step"/>
+        <result property="day" column="day"/>
+        <result property="startWeek" column="start_week"/>
+        <result property="endWeek" column="end_week"/>
+        <result property="weekType" column="week_type"/>
+        <result property="hlcTimestamp" column="hlc_timestamp"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <sql id="selectCourseColumns">
+        crdt_key, user_id, course_name, color, room, teacher, credit, course_code, syllabus_link,
+        start_node, step, day, start_week, end_week, week_type,
+        hlc_timestamp, is_deleted, deleted_at
+    </sql>
+
+    <!-- 根据ID获取课程 -->
+    <select id="getById" resultType="com.djj.todoscheduleserver.pojo.sync.CourseData">
+        SELECT * FROM course WHERE id = #{id}
+    </select>
+    
+    <!-- 根据CRDT键获取课程 -->
+    <select id="getByCrdtKey" resultMap="CourseResultMap">
+        SELECT <include refid="selectCourseColumns" />
+        FROM course 
+        WHERE crdt_key = #{crdtKey}
+    </select>
+    
+    <!-- 获取课表下的所有课程 -->
+    <select id="getAllByTableId" resultType="com.djj.todoscheduleserver.pojo.sync.CourseData">
+        SELECT * FROM course WHERE table_id = #{tableId}
+    </select>
+    
+    <!-- 获取用户的所有课程（未删除的） -->
+    <select id="getAllByUserId" resultMap="CourseResultMap">
+        SELECT <include refid="selectCourseColumns" />
+        FROM course 
+        WHERE user_id = #{userId} AND is_deleted = FALSE
+        ORDER BY start_node ASC, day ASC
+    </select>
+    
+    <!-- 获取用户在指定时间后更新的课程（包括已删除的） -->
+    <select id="getUpdatedAfterTimestamp" resultMap="CourseResultMap">
+        SELECT <include refid="selectCourseColumns" />
+        FROM course 
+        WHERE user_id = #{userId} AND hlc_timestamp > #{hlcTimestamp}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    
+    <!-- 获取用户在指定时间后更新的课程 -->
+    <select id="getUpdatedAfter" resultType="com.djj.todoscheduleserver.pojo.sync.CourseData">
+        SELECT c.* FROM course c JOIN `table` t ON c.table_id = t.id 
+        WHERE t.user_id = #{userId} AND c.updated_at > #{lastSyncTime}
+    </select>
+    
+    <!-- 新增课程 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO course (table_id, course_name, color, room, teacher, credit, course_code, syllabus_link)
+        VALUES (#{tableId}, #{courseName}, #{color}, #{room}, #{teacher}, #{credit}, #{courseCode}, #{syllabusLink})
+    </insert>
+    
+    <!-- 更新课程 -->
+    <update id="update">
+        UPDATE course
+        <set>
+            <if test="courseName != null">course_name = #{courseName},</if>
+            <if test="color != null">color = #{color},</if>
+            <if test="room != null">room = #{room},</if>
+            <if test="teacher != null">teacher = #{teacher},</if>
+            <if test="credit != null">credit = #{credit},</if>
+            <if test="courseCode != null">course_code = #{courseCode},</if>
+            <if test="syllabusLink != null">syllabus_link = #{syllabusLink},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 删除课程 -->
+    <delete id="delete">
+        DELETE FROM course WHERE id = #{id}
+    </delete>
+    
+    <!-- 批量删除课程 -->
+    <delete id="batchDelete">
+        DELETE FROM course WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+    
+    <!-- 检查课程是否属于指定用户 -->
+    <select id="checkCourseOwnership" resultType="int">
+        SELECT COUNT(*) FROM course c JOIN `table` t ON c.table_id = t.id 
+        WHERE c.id = #{courseId} AND t.user_id = #{userId}
+    </select>
+    
+    <!-- 新增或更新课程 -->
+    <insert id="insertOrUpdate" parameterType="com.djj.todoscheduleserver.pojo.Course">
+        INSERT INTO course (
+            crdt_key, user_id, course_name, color, room, teacher, credit, course_code, syllabus_link,
+            start_node, step, day, start_week, end_week, week_type,
+            hlc_timestamp, is_deleted, deleted_at
+        )
+        VALUES (
+            #{crdtKey}, #{userId}, #{courseName}, #{color}, #{room}, #{teacher}, #{credit}, #{courseCode}, #{syllabusLink},
+            #{startNode}, #{step}, #{day}, #{startWeek}, #{endWeek}, #{weekType},
+            #{hlcTimestamp}, #{isDeleted, jdbcType=BOOLEAN}, #{deletedAt, jdbcType=TIMESTAMP}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            course_name = VALUES(course_name),
+            color = VALUES(color),
+            room = VALUES(room),
+            teacher = VALUES(teacher),
+            credit = VALUES(credit),
+            course_code = VALUES(course_code),
+            syllabus_link = VALUES(syllabus_link),
+            start_node = VALUES(start_node),
+            step = VALUES(step),
+            day = VALUES(day),
+            start_week = VALUES(start_week),
+            end_week = VALUES(end_week),
+            week_type = VALUES(week_type),
+            hlc_timestamp = VALUES(hlc_timestamp),
+            is_deleted = VALUES(is_deleted),
+            deleted_at = VALUES(deleted_at)
+    </insert>
+    
+    <!-- 标记课程为已删除 -->
+    <update id="markAsDeleted">
+        UPDATE course
+        SET
+            is_deleted = TRUE,
+            deleted_at = #{deletedAt},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE
+            crdt_key = #{crdtKey}
+            AND (is_deleted = FALSE OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+</mapper> 

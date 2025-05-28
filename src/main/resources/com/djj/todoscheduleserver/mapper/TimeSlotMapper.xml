@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djj.todoscheduleserver.mapper.TimeSlotMapper">
+    
+    <resultMap id="TimeSlotResultMap" type="com.djj.todoscheduleserver.pojo.TimeSlot">
+        <id property="crdtKey" column="crdt_key"/>
+        <result property="userId" column="user_id"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="scheduleType" column="schedule_type"/>
+        <result property="scheduleCrdtKey" column="schedule_crdt_key"/>
+        <result property="head" column="head"/>
+        <result property="priority" column="priority"/>
+        <result property="isCompleted" column="is_completed"/>
+        <result property="isRepeated" column="is_repeated"/>
+        <result property="repeatPattern" column="repeat_pattern"/>
+        <result property="reminderType" column="reminder_type"/>
+        <result property="reminderOffset" column="reminder_offset"/>
+        <result property="isNotified" column="is_notified"/>
+        <result property="hlcTimestamp" column="hlc_timestamp"/>
+        <result property="isDeleted" column="is_deleted"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <sql id="selectTimeSlotColumns">
+        crdt_key, user_id, start_time, end_time, schedule_type, schedule_crdt_key,
+        head, priority, is_completed, is_repeated, repeat_pattern,
+        reminder_type, reminder_offset, is_notified,
+        hlc_timestamp, is_deleted, deleted_at
+    </sql>
+
+    <!-- 查询即将到来的任务 -->
+    <select id="findUpcomingTasks" resultType="com.djj.todoscheduleserver.pojo.TimeSlot">
+        SELECT * FROM time_slot WHERE start_time BETWEEN #{startTimeMin} AND #{startTimeMax}
+    </select>
+    
+    <!-- 查询未通知的即将到来的任务 -->
+    <select id="findNonNotifiedUpcomingTasks" resultType="com.djj.todoscheduleserver.pojo.TimeSlot">
+        SELECT * FROM time_slot 
+        WHERE start_time BETWEEN #{startTimeMin} AND #{startTimeMax} 
+        AND (is_notified IS NULL OR is_notified = 0)
+    </select>
+    
+    <!-- 标记为已通知 -->
+    <update id="markAsNotified">
+        UPDATE time_slot SET is_notified = 1 WHERE crdt_key = #{crdtKey}
+    </update>
+    
+    <!-- 获取普通日程标题 -->
+    <select id="getOrdinaryScheduleTitle" resultType="java.lang.String">
+        SELECT title FROM ordinary_schedule WHERE schedule_crdt_key = #{scheduleCrdtKey}
+    </select>
+    
+    <!-- 获取普通日程位置 -->
+    <select id="getOrdinaryScheduleLocation" resultType="java.lang.String">
+        SELECT location FROM ordinary_schedule WHERE schedule_crdt_key = #{scheduleCrdtKey}
+    </select>
+    
+    <!-- 获取课程标题 -->
+    <select id="getCourseTitle" resultType="java.lang.String">
+        SELECT course_name FROM course WHERE id = 
+        (SELECT course_id FROM course_node WHERE id = #{courseNodeId})
+    </select>
+    
+    <!-- 获取课程位置 -->
+    <select id="getCourseLocation" resultType="java.lang.String">
+        SELECT room FROM course_node WHERE id = #{courseNodeId}
+    </select>
+    
+    <!-- 根据CRDT Key获取时间槽 -->
+    <select id="getByCrdtKey" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE crdt_key = #{crdtKey}
+    </select>
+    
+    <!-- 获取用户的所有时间槽（未删除的） -->
+    <select id="getAllByUserId" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE user_id = #{userId} AND is_deleted = FALSE
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 获取用户在指定时间范围内的时间槽（未删除的） -->
+    <select id="getByTimeRange" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE user_id = #{userId} 
+        AND is_deleted = FALSE
+        AND (
+            (start_time BETWEEN #{startTime} AND #{endTime})
+            OR (end_time BETWEEN #{startTime} AND #{endTime})
+            OR (start_time &lt;= #{startTime} AND end_time >= #{endTime})
+        )
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 获取与特定日程或课程关联的所有时间槽（未删除的） -->
+    <select id="getByScheduleCrdtKey" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE user_id = #{userId}
+        AND schedule_type = #{scheduleType}
+        AND schedule_crdt_key = #{scheduleCrdtKey}
+        AND is_deleted = FALSE
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 获取用户在指定时间后更新的时间槽（包括已删除的） -->
+    <select id="getUpdatedAfterTimestamp" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE user_id = #{userId} AND hlc_timestamp > #{hlcTimestamp}
+        ORDER BY hlc_timestamp ASC
+    </select>
+    
+    <!-- 获取需要提醒的时间槽 -->
+    <select id="getRemindersToSend" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE is_deleted = FALSE
+        AND reminder_type IS NOT NULL
+        AND is_notified = FALSE
+        AND start_time - reminder_offset &lt;= #{currentTime}
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 获取即将到来的需要提醒的时间槽 -->
+    <select id="getUpcomingReminders" resultMap="TimeSlotResultMap">
+        SELECT <include refid="selectTimeSlotColumns" />
+        FROM time_slot 
+        WHERE is_deleted = FALSE
+        AND reminder_type IS NOT NULL
+        AND (is_notified IS NULL OR is_notified = FALSE)
+        AND (start_time - reminder_offset) BETWEEN #{currentTimeMillis} AND (#{currentTimeMillis} + #{lookAheadMillis})
+        ORDER BY start_time ASC
+    </select>
+    
+    <!-- 新增或更新时间槽 -->
+    <insert id="insertOrUpdate" parameterType="com.djj.todoscheduleserver.pojo.TimeSlot">
+        INSERT INTO time_slot (
+            crdt_key, user_id, start_time, end_time, schedule_type, schedule_crdt_key,
+            head, priority, is_completed, is_repeated, repeat_pattern,
+            reminder_type, reminder_offset, is_notified,
+            hlc_timestamp, is_deleted, deleted_at
+        )
+        VALUES (
+            #{crdtKey}, #{userId}, #{startTime}, #{endTime}, #{scheduleType}, #{scheduleCrdtKey},
+            #{head}, #{priority}, #{isCompleted}, #{isRepeated}, #{repeatPattern},
+            #{reminderType}, #{reminderOffset}, #{isNotified},
+            #{hlcTimestamp}, #{isDeleted, jdbcType=BOOLEAN}, #{deletedAt, jdbcType=TIMESTAMP}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            start_time = VALUES(start_time),
+            end_time = VALUES(end_time),
+            schedule_type = VALUES(schedule_type),
+            schedule_crdt_key = VALUES(schedule_crdt_key),
+            head = VALUES(head),
+            priority = VALUES(priority),
+            is_completed = VALUES(is_completed),
+            is_repeated = VALUES(is_repeated),
+            repeat_pattern = VALUES(repeat_pattern),
+            reminder_type = VALUES(reminder_type),
+            reminder_offset = VALUES(reminder_offset),
+            is_notified = VALUES(is_notified),
+            hlc_timestamp = VALUES(hlc_timestamp),
+            is_deleted = VALUES(is_deleted),
+            deleted_at = VALUES(deleted_at)
+    </insert>
+    
+    <!-- 标记时间槽为已删除 -->
+    <update id="markAsDeleted">
+        UPDATE time_slot
+        SET
+            is_deleted = TRUE,
+            deleted_at = #{deletedAt},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE
+            crdt_key = #{crdtKey}
+            AND (is_deleted = FALSE OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+    
+    <!-- 更新时间槽的提醒状态 -->
+    <update id="updateNotificationStatus">
+        UPDATE time_slot
+        SET is_notified = #{isNotified}
+        WHERE crdt_key = #{crdtKey}
+    </update>
+</mapper> 

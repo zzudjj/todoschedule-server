@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信授权成功</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #07C160;
+            text-align: center;
+        }
+        .info-box {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #07C160;
+        }
+        .info-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            word-break: break-all;
+            color: #666;
+        }
+        .success-icon {
+            text-align: center;
+            font-size: 60px;
+            margin: 20px 0;
+            color: #07C160;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .error {
+            color: #ff4d4f;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>微信授权</h1>
+        
+        <div id="loading">正在处理授权结果...</div>
+        
+        <div id="success-content" style="display:none">
+            <div class="success-icon">✓</div>
+            <h2 style="text-align:center">授权成功</h2>
+            
+            <div class="info-box">
+                <div class="info-label">OpenID:</div>
+                <div class="info-value" id="openid"></div>
+            </div>
+            
+            <div class="info-box" id="user-id-box" style="display:none">
+                <div class="info-label">用户ID:</div>
+                <div class="info-value" id="user-id"></div>
+            </div>
+            
+            <a href="#" class="button" id="continue-btn">继续访问应用</a>
+        </div>
+        
+        <div id="error-content" style="display:none">
+            <div class="error">
+                <h2>授权失败</h2>
+                <p id="error-message">获取授权信息时出现错误，请重试。</p>
+            </div>
+            <a href="#" class="button" style="background-color:#ff4d4f" id="retry-btn">重新授权</a>
+        </div>
+    </div>
+    
+    <script>
+        // 解析URL参数
+        function getUrlParams() {
+            const params = {};
+            const queryString = window.location.search.substring(1);
+            const pairs = queryString.split('&');
+            
+            for (const pair of pairs) {
+                const parts = pair.split('=');
+                params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+            }
+            
+            return params;
+        }
+        
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = getUrlParams();
+            const loading = document.getElementById('loading');
+            const successContent = document.getElementById('success-content');
+            const errorContent = document.getElementById('error-content');
+            const openidElem = document.getElementById('openid');
+            const userIdBox = document.getElementById('user-id-box');
+            const userIdElem = document.getElementById('user-id');
+            const errorMessage = document.getElementById('error-message');
+            const continueBtn = document.getElementById('continue-btn');
+            const retryBtn = document.getElementById('retry-btn');
+            
+            // 检查是否有错误
+            if (params.error) {
+                loading.style.display = 'none';
+                errorContent.style.display = 'block';
+                errorMessage.textContent = params.error === 'auth_error' 
+                    ? '授权过程中发生错误，请重试。' 
+                    : '获取授权信息失败，请重试。';
+                retryBtn.href = '/oauth/authorize';
+                return;
+            }
+            
+            // 检查是否有openid
+            if (params.openid) {
+                loading.style.display = 'none';
+                successContent.style.display = 'block';
+                openidElem.textContent = params.openid;
+                
+                // 如果有用户ID，显示用户ID
+                if (params.user_id) {
+                    userIdBox.style.display = 'block';
+                    userIdElem.textContent = params.user_id;
+                }
+                
+                // 设置继续按钮链接
+                // 这里假设回到应用首页，可以根据需要修改
+                continueBtn.href = '/';
+                
+                // 将openid保存到本地存储，以便应用其他部分使用
+                localStorage.setItem('wx_openid', params.openid);
+                if (params.user_id) {
+                    localStorage.setItem('user_id', params.user_id);
+                }
+            } else {
+                // 没有openid，显示错误
+                loading.style.display = 'none';
+                errorContent.style.display = 'block';
+                errorMessage.textContent = '未能获取授权信息，请重试。';
+                retryBtn.href = '/oauth/authorize';
+            }
+        });
+    </script>
+</body>
+</html> 
