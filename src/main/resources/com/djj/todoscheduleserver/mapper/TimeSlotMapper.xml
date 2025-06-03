@@ -188,4 +188,74 @@
         SET is_notified = #{isNotified}
         WHERE crdt_key = #{crdtKey}
     </update>
-</mapper> 
+    
+    <!-- CRDT版本：更新时间槽的提醒状态 -->
+    <update id="updateNotificationStatusCrdt">
+        UPDATE time_slot
+        SET 
+            is_notified = #{isNotified},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE 
+            crdt_key = #{crdtKey}
+            AND user_id = #{userId}
+            AND (hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+    
+    <!-- CRDT版本：更新时间槽的完成状态 -->
+    <update id="updateCompletionStatusCrdt">
+        UPDATE time_slot
+        SET 
+            is_completed = #{isCompleted},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE 
+            crdt_key = #{crdtKey}
+            AND user_id = #{userId}
+            AND (hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+    
+    <!-- CRDT版本：标记时间槽为已删除 -->
+    <update id="markAsDeletedCrdt">
+        UPDATE time_slot
+        SET
+            is_deleted = TRUE,
+            deleted_at = #{deletedAt},
+            hlc_timestamp = #{hlcTimestamp}
+        WHERE
+            crdt_key = #{crdtKey}
+            AND user_id = #{userId}
+            AND (hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp})
+    </update>
+    
+    <!-- CRDT版本：新增或更新时间槽 -->
+    <insert id="insertOrUpdateCrdt" parameterType="com.djj.todoscheduleserver.pojo.TimeSlot">
+        INSERT INTO time_slot (
+            crdt_key, user_id, start_time, end_time, schedule_type, schedule_crdt_key,
+            head, priority, is_completed, is_repeated, repeat_pattern,
+            reminder_type, reminder_offset, is_notified,
+            hlc_timestamp, is_deleted, deleted_at
+        )
+        VALUES (
+            #{crdtKey}, #{userId}, #{startTime}, #{endTime}, #{scheduleType}, #{scheduleCrdtKey},
+            #{head}, #{priority}, #{isCompleted}, #{isRepeated}, #{repeatPattern},
+            #{reminderType}, #{reminderOffset}, #{isNotified},
+            #{hlcTimestamp}, #{isDeleted, jdbcType=BOOLEAN}, #{deletedAt, jdbcType=TIMESTAMP}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = #{userId},
+            start_time = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(start_time) ELSE start_time END,
+            end_time = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(end_time) ELSE end_time END,
+            schedule_type = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(schedule_type) ELSE schedule_type END,
+            schedule_crdt_key = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(schedule_crdt_key) ELSE schedule_crdt_key END,
+            head = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(head) ELSE head END,
+            priority = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(priority) ELSE priority END,
+            is_completed = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(is_completed) ELSE is_completed END,
+            is_repeated = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(is_repeated) ELSE is_repeated END,
+            repeat_pattern = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(repeat_pattern) ELSE repeat_pattern END,
+            reminder_type = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(reminder_type) ELSE reminder_type END,
+            reminder_offset = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(reminder_offset) ELSE reminder_offset END,
+            is_notified = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(is_notified) ELSE is_notified END,
+            hlc_timestamp = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(hlc_timestamp) ELSE hlc_timestamp END,
+            is_deleted = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(is_deleted) ELSE is_deleted END,
+            deleted_at = CASE WHEN hlc_timestamp IS NULL OR hlc_timestamp &lt; #{hlcTimestamp} THEN VALUES(deleted_at) ELSE deleted_at END
+    </insert>
+</mapper>

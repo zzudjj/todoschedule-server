@@ -43,13 +43,11 @@
         ORDER BY hlc_timestamp ASC
     </select>
 
-    <!-- 
     <select id="getAllMessagesForUser" resultType="com.djj.todoscheduleserver.pojo.crdt.SyncMessage">
         SELECT id, user_id, entity_type, crdt_key as crdtKey, message_data, hlc_timestamp, origin_device_id, created_at
         FROM sync_message
         WHERE user_id = #{userId}
         ORDER BY hlc_timestamp ASC
     </select>
-    -->
 
-</mapper> 
+</mapper>

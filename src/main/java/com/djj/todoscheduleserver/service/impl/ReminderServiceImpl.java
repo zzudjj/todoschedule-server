@@ -77,17 +77,21 @@ public class ReminderServiceImpl implements ReminderService {
         }
 
         for (TimeSlot timeSlot : upcomingTimeSlots) {
-            if (timeSlot.getIsDeleted() != null && timeSlot.getIsDeleted()) continue; // 跳过软删除的
-            if (timeSlot.getIsCompleted() != null && timeSlot.getIsCompleted()) continue; // 跳过已完成的
-            if (timeSlot.getIsNotified() != null && timeSlot.getIsNotified()) continue; // 跳过已通知的
-            
-            // 在应用逻辑中再次精确检查提醒时间
-            if (timeSlot.getStartTime() != null && timeSlot.getReminderOffset() != null) {
-                long reminderTime = timeSlot.getStartTime() - timeSlot.getReminderOffset();
-                if (currentTimeMillis >= reminderTime && currentTimeMillis < reminderTime + REMINDER_LOOKAHEAD_WINDOW_MS) {
+//            if (timeSlot.getIsDeleted() != null && timeSlot.getIsDeleted()) continue; // 跳过软删除的
+//            if (timeSlot.getIsCompleted() != null && timeSlot.getIsCompleted()) continue; // 跳过已完成的
+//            if (timeSlot.getIsNotified() != null && timeSlot.getIsNotified()) continue; // 跳过已通知的
+//
+//            log.info("即将发送消息");
+//            // 在应用逻辑中再次精确检查提醒时间
+//            if (timeSlot.getStartTime() != null && timeSlot.getReminderOffset() != null) {
+//                long reminderTime = timeSlot.getStartTime() - timeSlot.getReminderOffset();
+//                log.info("即将发送消息");
+//                log.info("currentTimeMillis = {}, reminderTime = {} \n currentTimeMillis = {}, reminderTime + REMINDER_LOOKAHEAD_WINDOW_MS = {}", currentTimeMillis, reminderTime, currentTimeMillis, reminderTime + REMINDER_LOOKAHEAD_WINDOW_MS);
+//                if (currentTimeMillis >= reminderTime && currentTimeMillis < reminderTime + REMINDER_LOOKAHEAD_WINDOW_MS) {
+//                    log.info("即将发送消息");
                     sendReminderForTimeSlot(timeSlot);
-                }
-            }
+//                }
+//            }
         }
     }
     
