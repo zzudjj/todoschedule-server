@@ -8,6 +8,8 @@ import com.djj.todoscheduleserver.pojo.crdt.SyncMessage;
 import com.djj.todoscheduleserver.service.HlcService;
 import com.djj.todoscheduleserver.service.SyncService;
 import com.djj.todoscheduleserver.service.UserService;
+import com.djj.todoscheduleserver.utils.OrdinaryScheduleParserUtil;
+import com.djj.todoscheduleserver.utils.TimeSlotParserUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +44,12 @@ public class SyncServiceImpl implements SyncService {
     
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private OrdinaryScheduleParserUtil ordinaryScheduleParserUtil;
+
+    @Autowired
+    private TimeSlotParserUtil timeSlotParserUtil;
     
     @Override
     @Transactional
@@ -68,6 +76,10 @@ public class SyncServiceImpl implements SyncService {
                 syncMessage.setCreatedAt(new Timestamp(System.currentTimeMillis()));
                 
                 syncMessageMapper.insert(syncMessage);
+
+                ordinaryScheduleParserUtil.processSyncMessage(syncMessage);
+                timeSlotParserUtil.processSyncMessage(syncMessage);
+
 
             } catch (JsonProcessingException e) {
                 log.error("解析来自设备 {} 的CRDT消息失败: {}", deviceId, msgData, e);
